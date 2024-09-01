@@ -1,4 +1,12 @@
 const { User } = require('../models/');
+const redis = require('redis');
+
+const client = redis.createClient({
+    url: 'redis://localhost:6379'
+});
+client.connect().catch((error)=>{
+    console.log(error);
+})
 
 const userService = {}
 
@@ -14,7 +22,14 @@ userService.getAllUsers = async () => {
 };
 userService.getSpecificUser = async (userId) => {
     try {
-        const users = await User.findAll({where :{id: userId}});
+        const userCacheKey='user_cache_key';
+        const userData = await client.hGet(userCacheKey,String(userId));
+        if(userData){
+            return JSON.parse(userData);
+        }
+        let users = await User.findAll({where :{id: userId}});
+        users=users[0].dataValues;
+        await client.hSet(userCacheKey,userId,JSON.stringify(users));
         return users;
     }
     catch (err) {
